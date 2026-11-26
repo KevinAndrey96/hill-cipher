@@ -114,7 +114,7 @@ uv run ruff check src tests && uv run ruff format --check src tests
 uv run mypy
 ```
 
-41 pruebas con cobertura del 100 % de líneas y ramas. Además de los vectores de Wikipedia, las pruebas basadas en propiedades con Hypothesis comparan el determinante de Bareiss con la expansión de Laplace, comprueban $A\,\operatorname{adj}(A) = \det(A)\,I$ y $A A^{-1} \equiv I$ en matrices aleatorias de hasta $4 \times 4$, verifican que descifrar invierte al cifrar y que el ataque recupera cualquier clave invertible de $2 \times 2$. El pipeline de GitHub Actions ejecuta Ruff y mypy en modo estricto, las pruebas en Python 3.12, 3.13 y 3.14, una prueba de humo del comando instalado y la construcción del paquete con `twine check`.
+42 pruebas con cobertura del 100 % de líneas y ramas. Además de los vectores de Wikipedia, las pruebas basadas en propiedades con Hypothesis comparan el determinante de Bareiss con la expansión de Laplace, comprueban $A\,\operatorname{adj}(A) = \det(A)\,I$ y $A A^{-1} \equiv I$ en matrices aleatorias de hasta $4 \times 4$, verifican que descifrar invierte al cifrar y que el ataque recupera cualquier clave invertible de $2 \times 2$. El pipeline de GitHub Actions ejecuta Ruff y mypy en modo estricto, las pruebas en Python 3.12, 3.13 y 3.14, una prueba de humo del comando instalado y la construcción del paquete con `twine check`.
 
 ## Historia del proyecto
 
