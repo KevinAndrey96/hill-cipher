@@ -42,3 +42,10 @@ def test_recovers_any_invertible_two_by_two_key(values: tuple[int, int, int, int
     key = HillKey.from_matrix([values[:2], values[2:]])
 
     assert recover_key(MESSAGE, encrypt(MESSAGE, key), 2) == key
+
+
+def test_rejects_texts_whose_blocks_are_dependent_modulo_two() -> None:
+    key = HillKey.from_matrix([[3, 3], [2, 5]])
+
+    with pytest.raises(AttackError, match="no consistent invertible key"):
+        recover_key("ataquealamanecer", encrypt("ataquealamanecer", key), 2)

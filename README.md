@@ -62,6 +62,8 @@ $$
 
 `recover_key` busca entre los bloques conocidos una combinación con $P$ invertible, calcula el candidato y lo valida contra todos los pares. Doce letras del ejemplo de Wikipedia bastan para recuperar la clave `HILL`.
 
+El ataque necesita bloques linealmente independientes módulo 2 y módulo 13. Un texto como `ATAQUEALAMANECER` no alcanza para una clave de $2 \times 2$: todos sus bloques empiezan por A, E o U, valores pares, así que ninguna combinación es invertible módulo 2 y la clave queda indeterminada en esa componente; `recover_key` lo informa con `AttackError` en lugar de devolver una clave adivinada.
+
 ## Uso
 
 Requiere Python 3.12 o superior y [uv](https://docs.astral.sh/uv/).
@@ -87,9 +89,9 @@ Como librería:
 from hill import HillKey, decrypt, encrypt, recover_key
 
 clave = HillKey.from_matrix([[3, 3], [2, 5]])
-cifrado = encrypt("Ataque al amanecer", clave)
-decrypt(cifrado, clave)                       # 'ATAQUEALAMANECER'
-recover_key("ataquealamanecer", cifrado, 2)   # devuelve la misma clave
+cifrado = encrypt("Nos vemos en la plaza mayor", clave)   # 'DSNLWQSOZVHWAHXVKIUQPJ'
+decrypt(cifrado, clave)                                   # 'NOSVEMOSENLAPLAZAMAYOR'
+recover_key("Nos vemos en la plaza mayor", cifrado, 2)    # devuelve la misma clave
 ```
 
 ## Arquitectura
