@@ -1,125 +1,127 @@
-# Cifrado Polialfabético de Hill (Matriz 2x2) en Python
+# Cifrado de Hill con álgebra lineal modular en Python
 
-[![Python 3.8+](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
-[![NumPy](https://img.shields.io/badge/NumPy-Supported-013243.svg)](https://numpy.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/KevinAndrey96/python-hill-cipher-linear-algebra/actions/workflows/ci.yml/badge.svg)](https://github.com/KevinAndrey96/python-hill-cipher-linear-algebra/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13%20%7C%203.14-3776AB)
+![Cobertura](https://img.shields.io/badge/cobertura-100%25-brightgreen)
+![mypy](https://img.shields.io/badge/mypy-strict-2A6DB2)
+[![Licencia: MIT](https://img.shields.io/badge/licencia-MIT-yellow.svg)](LICENSE)
 
-Implementación interactiva en Python del **Cifrado de Hill** para bloques de tamaño $2$ ($m = 2$) mediante álgebra lineal modular y matrices bidimensionales con **NumPy**. El proyecto contempla el cifrado de digramas, cálculo modular de determinantes, obtención del inverso multiplicativo mediante el algoritmo extendido de Euclides, derivación de la matriz adjunta y descifrado completo.
+Implementación tipada y probada del **cifrado de Hill** para matrices clave de cualquier tamaño $n \times n$, con aritmética entera exacta en $\mathbb{Z}_{26}$: determinante por eliminación de Bareiss, matriz adjunta, inversa modular, validación de claves y el **ataque de texto plano conocido** que demuestra por qué este cifrado es lineal y, por tanto, débil.
 
----
+## Contenido
 
-## 🔐 Fundamento Teórico y Matemático
+- [El cifrado](#el-cifrado)
+- [Inversa modular](#inversa-modular)
+- [Ataque de texto plano conocido](#ataque-de-texto-plano-conocido)
+- [Uso](#uso)
+- [Arquitectura](#arquitectura)
+- [Pruebas y calidad](#pruebas-y-calidad)
+- [Historia del proyecto](#historia-del-proyecto)
 
-Inventado por el matemático estadounidense **Lester S. Hill** en 1929, el cifrado de Hill fue el primer cifrador polialfabético práctico basado en transformaciones lineales sobre el anillo conmutativo $\mathbb{Z}_{26}$ (alfabeto inglés clásico de 26 caracteres $A=0, B=1, \dots, Z=25$).
+## El cifrado
 
-### 1. Proceso de Cifrado
+Lester S. Hill lo publicó en 1929. Con $A = 0, \dots, Z = 25$, el texto se divide en bloques de $n$ letras que se tratan como vectores columna y se multiplican por una matriz clave $K$:
 
-El texto claro se particiona en vectores fila de digramas $\mathbf{P} = [p_1, p_2]$. La clave criptográfica es una matriz cuadrada invertible $\mathbf{K} \in \mathcal{M}_{2 \times 2}(\mathbb{Z}_{26})$:
+$$
+\mathbf{c} = K\,\mathbf{p} \pmod{26}, \qquad \mathbf{p} = K^{-1}\,\mathbf{c} \pmod{26}.
+$$
 
-$$\mathbf{K} = \begin{bmatrix} k_{11} & k_{12} \\ k_{21} & k_{22} \end{bmatrix}$$
+Si el último bloque queda incompleto se rellena con X. Con la clave de Wikipedia `HILL`, que llena la matriz por filas:
 
-El vector cifrado $\mathbf{C} = [c_1, c_2]$ se calcula multiplicando el vector de texto claro por la matriz clave módulo 26:
+$$
+K = \begin{pmatrix} 7 & 8 \\ 11 & 11 \end{pmatrix}, \qquad
+\texttt{SHORTEXAMPLE} \longmapsto \texttt{APADJTFTWLFJ}.
+$$
 
-$$\mathbf{C} \equiv \mathbf{P} \cdot \mathbf{K} \pmod{26}$$
+Con la clave de $3 \times 3$ `GYBNQKURP`, `ACT` se cifra como `POH` y `CAT` como `FIN`.
 
-O en forma escalar:
+## Inversa modular
 
-$$\begin{cases}
-c_1 = (p_1 k_{11} + p_2 k_{21}) \pmod{26} \\
-c_2 = (p_1 k_{12} + p_2 k_{22}) \pmod{26}
-\end{cases}$$
+Una matriz sirve como clave solo si es invertible módulo 26, es decir, si su determinante es coprimo con 26 (impar y no múltiplo de 13):
 
-### 2. Condición de Invertibilidad de la Clave
+$$
+\gcd\big(\det K \bmod 26,\; 26\big) = 1, \qquad
+K^{-1} \equiv (\det K)^{-1}\,\operatorname{adj}(K) \pmod{26}.
+$$
 
-Para que el mensaje cifrado pueda ser descifrado de forma única, la matriz clave $\mathbf{K}$ debe ser invertible en $\mathbb{Z}_{26}$. Esto exige que su determinante sea coprimo con 26:
+El determinante se calcula con la eliminación de Bareiss, que divide de forma exacta y nunca sale de los enteros, y el inverso de $\det K$ con `pow(d, -1, 26)`. Para `GYBNQKURP` el determinante es 441, que equivale a 25 módulo 26, y la inversa resulta
 
-$$\gcd(\det(\mathbf{K}) \pmod{26}, 26) = 1$$
+$$
+K^{-1} = \begin{pmatrix} 8 & 5 & 10 \\ 21 & 8 & 21 \\ 21 & 12 & 8 \end{pmatrix}.
+$$
 
-Si $\gcd(\det(\mathbf{K}), 26) \ne 1$, la matriz no posee inverso multiplicativo y no puede ser utilizada como clave.
+La versión original de 2020 multiplicaba la adjunta por $1/\det K$ como número de punto flotante, lo cual solo es correcto cuando el determinante vale 1 módulo 26; con cualquier otra clave el descifrado devolvía letras equivocadas.
 
-### 3. Proceso de Descifrado
+## Ataque de texto plano conocido
 
-El descifrado requiere calcular la matriz inversa modular $\mathbf{K}^{-1} \pmod{26}$:
+Si un atacante conoce $n$ bloques de texto plano cuyas columnas forman una matriz $P$ invertible y sus cifrados $C$, entonces $C = KP$ y la clave completa sale de una sola multiplicación:
 
-$$\mathbf{K}^{-1} \equiv d^{-1} \cdot \text{adj}(\mathbf{K}) \pmod{26}$$
+$$
+K = C\,P^{-1} \pmod{26}.
+$$
 
-Donde:
-1. $d = \det(\mathbf{K}) = (k_{11} k_{22} - k_{12} k_{21}) \pmod{26}$.
-2. $d^{-1}$ es el inverso multiplicativo de $d$ en $\mathbb{Z}_{26}$, tal que $(d \cdot d^{-1}) \equiv 1 \pmod{26}$.
-3. La matriz adjunta clásica para una matriz $2 \times 2$ es:
+`recover_key` busca entre los bloques conocidos una combinación con $P$ invertible, calcula el candidato y lo valida contra todos los pares. Doce letras del ejemplo de Wikipedia bastan para recuperar la clave `HILL`.
 
-$$\text{adj}(\mathbf{K}) = \begin{bmatrix} k_{22} & -k_{12} \\ -k_{21} & k_{11} \end{bmatrix} \pmod{26}$$
+## Uso
 
-El vector claro original se recupera mediante:
+Requiere Python 3.12 o superior y [uv](https://docs.astral.sh/uv/).
 
-$$\mathbf{P} \equiv \mathbf{C} \cdot \mathbf{K}^{-1} \pmod{26}$$
+```bash
+uv sync
+uv run hill encrypt -k HILL "short example"
+# APADJTFTWLFJ
+uv run hill decrypt -m "7 8 11 11" APADJTFTWLFJ
+# SHORTEXAMPLE
+uv run hill encrypt -m "6,24,1,13,16,10,20,17,15" ACT
+# POH
+uv run hill attack -n 2 shortexample APADJTFTWLFJ
+#  7  8
+# 11 11
+```
 
----
+La clave se da como palabra (`--keyword`, de 4, 9, 16... letras) o como matriz por filas (`--matrix`). Si se omite el texto, se lee de la entrada estándar. Una matriz no invertible, un criptograma que no completa bloques o un ataque sin datos suficientes terminan con código 2 y un mensaje en la salida de error.
 
-## 📂 Estructura del Repositorio
+Como librería:
+
+```python
+from hill import HillKey, decrypt, encrypt, recover_key
+
+clave = HillKey.from_matrix([[3, 3], [2, 5]])
+cifrado = encrypt("Ataque al amanecer", clave)
+decrypt(cifrado, clave)                       # 'ATAQUEALAMANECER'
+recover_key("ataquealamanecer", cifrado, 2)   # devuelve la misma clave
+```
+
+## Arquitectura
 
 ```text
-hill-cipher/
-├── main.py          # Script principal con algoritmos interactivos de cifrado y descifrado
-├── Cifrado.png      # Captura de pantalla de ejecucion del cifrado
-├── Descifrado.png   # Captura de pantalla de ejecucion del descifrado
-├── Descifrado2.png  # Validacion de casos de prueba adicionales
-├── Video.txt        # Enlace a demostracion multimedia en YouTube
-└── Cifrado de Hill.mp4 # Video explicativo local del algoritmo
+src/hill/
+  modular.py   matrices inmutables, Bareiss, adjunta, inversa y producto módulo m
+  cipher.py    HillKey validada, relleno, cifrado y descifrado por bloques
+  attack.py    recuperación de la clave con texto plano conocido
+  cli.py       comandos encrypt, decrypt y attack
 ```
 
----
+`HillKey` valida la matriz y precalcula su inversa al construirse, así que una clave inválida no puede llegar al cifrado. Sin dependencias externas; los errores se reportan con `InvalidKeyError`, `SingularMatrixError` y `AttackError`, subclases de `ValueError`.
 
-## 🚀 Requisitos e Instalación
-
-### Prerrequisitos
-
-- **Python** (versión 3.8 o superior).
-- Biblioteca **NumPy**.
-
-### Instalación de Dependencias
+## Pruebas y calidad
 
 ```bash
-pip install numpy
+uv run pytest --cov
+uv run ruff check src tests && uv run ruff format --check src tests
+uv run mypy
 ```
 
----
+41 pruebas con cobertura del 100 % de líneas y ramas. Además de los vectores de Wikipedia, las pruebas basadas en propiedades con Hypothesis comparan el determinante de Bareiss con la expansión de Laplace, comprueban $A\,\operatorname{adj}(A) = \det(A)\,I$ y $A A^{-1} \equiv I$ en matrices aleatorias de hasta $4 \times 4$, verifican que descifrar invierte al cifrar y que el ataque recupera cualquier clave invertible de $2 \times 2$. El pipeline de GitHub Actions ejecuta Ruff y mypy en modo estricto, las pruebas en Python 3.12, 3.13 y 3.14, una prueba de humo del comando instalado y la construcción del paquete con `twine check`.
 
-## 💻 Guía de Uso
+## Historia del proyecto
 
-Ejecuta el script principal:
+El proyecto nació en abril de 2020 como un script interactivo de $2 \times 2$ con NumPy para la clase de criptografía, acompañado de un [video explicativo](https://youtu.be/QiWCjD9dOM4). Aquel script usaba vectores fila ($\mathbf{c} = \mathbf{p}K$, equivalente a usar $K^\top$ en la convención de columnas) y tenía el error de la inversa en punto flotante descrito arriba. En 2026 se reescribió como un paquete tipado sin dependencias, generalizado a $n \times n$, con la inversa modular correcta, validación de claves, el ataque de texto plano conocido y pruebas automatizadas; además se eliminaron del historial el entorno virtual, los archivos del IDE y un video de 43 MB que se habían versionado. El código original se conserva en el tag [`v0.1-python-coursework-2020`](https://github.com/KevinAndrey96/python-hill-cipher-linear-algebra/tree/v0.1-python-coursework-2020).
 
-```bash
-python main.py
-```
+## Autor
 
-### 1. Cifrado
+**Kevin Andrey Herrera Silva** · [GitHub](https://github.com/KevinAndrey96)
 
-1. Selecciona la opción `1`.
-2. Introduce el texto claro (los espacios se eliminan automáticamente y se convierte a mayúsculas).
-3. Introduce los 4 valores enteros para la matriz clave $2 \times 2$:
-   - Posición 0,0 ($k_{11}$)
-   - Posición 0,1 ($k_{12}$)
-   - Posición 1,0 ($k_{21}$)
-   - Posición 1,1 ($k_{22}$)
-4. El script imprimirá la matriz clave, la descomposición en digramas y el criptograma resultante.
+## Licencia
 
-### 2. Descifrado
-
-1. Selecciona la opción `2`.
-2. Introduce el criptograma a descifrar.
-3. Introduce la misma matriz clave $2 \times 2$.
-4. El script calculará el determinante, validará la coprimalidad, obtendrá el inverso modular y derivará el texto claro original.
-
----
-
-## 📹 Demostración en Video
-
-Demostración práctica del funcionamiento paso a paso en YouTube:
-[Demostración en YouTube](https://youtu.be/4e0-F3E4zbc)
-
----
-
-## 📄 Licencia
-
-Distribuido bajo la Licencia MIT. Consulta el archivo `LICENSE` para más información.
+Distribuido bajo la [licencia MIT](LICENSE).
